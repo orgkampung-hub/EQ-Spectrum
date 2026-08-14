@@ -1,7 +1,5 @@
 const CACHE_NAME = 'eq-spectrum-v1';
-
-// Senaraikan semua fail asas aplikasi
-const ASSETS_TO_CACHE = [
+const ASSETS = [
   './',
   './index.html',
   './manifest.json',
@@ -9,25 +7,23 @@ const ASSETS_TO_CACHE = [
   './icon-512.png'
 ];
 
-// 1. Install Event - Cache semua aset utama
-self.addEventListener('install', (event) => {
-  event.waitUntil(
+// Install Event - Simpan fail dalam cache untuk kegunaan offline
+self.addEventListener('install', (e) => {
+  e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching app shell & assets');
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(ASSETS);
     }).then(() => self.skipWaiting())
   );
 });
 
-// 2. Activate Event - Buang cache lama jika ada update versi
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
+// Activate Event - Bersihkan cache lama jika ada kemaskini
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('[SW] Clearing old cache:', cache);
-            return caches.delete(cache);
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
           }
         })
       );
@@ -35,31 +31,14 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Fetch Event - Strategy: Cache First, Fallback to Network
-self.addEventListener('fetch', (event) => {
-  // Hanya proses request GET
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+// Fetch Event - Wajib ada supaya sokong mode Offline dan layak di-Install sebagai PWA
+self.addEventListener('fetch', (e) => {
+  e.respondWith(
+    caches.match(e.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(event.request).then((networkResponse) => {
-        // Simpan salinan fail baharu ke dalam cache secara dinamik
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      });
-    }).catch(() => {
-      // Fallback jika terus tiada internet dan tiada cache
-      if (event.request.mode === 'navigate') {
-        return caches.match('./index.html');
-      }
+      return fetch(e.request);
     })
   );
 });
